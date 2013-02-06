@@ -19,7 +19,7 @@
 
 # Идеи статей
 
-* Файл как жесткий диск [наброски](https://github.com/rumkin/throw-linux/wiki/File-as-hard-drive) . Чтение/запись в C++
+* Файл как жесткий диск [наброски](https://github.com/rumkin/through-linux/wiki/File-as-hard-drive) . Чтение/запись в C++
 * Библиоткеа для работы с примитивной базой данных в виде файла-жесткого диска. Модуль для nodejs/php на C++ использующий библиотеку.
 * http-сервер на nodejs: fcgi, respawn, балансировщик
 
