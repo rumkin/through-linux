@@ -1,11 +1,4 @@
-<?php
-
-header("HTTP/1.1 500 Internal server error", true, 500);
-error_reporting(-1);
-
-echo $a
-
-?><html>
+<html>
 <head>
 	<title>THERE</title>
 </head>
@@ -14,6 +7,6 @@ echo $a
 		<input type="text" name="hello" value="POST">
 		<input type="submit"?>
 	</form>
-	<pre><?= var_dump($_POST); ?></pre>
+	<pre><?= htmlspecialchars((json_encode($_POST, JSON_PRETTY_PRINT))); ?></pre>
 </body>
 </html>
