@@ -1,6 +1,10 @@
 <?php
 
-echo "THERE";
+header("HTTP/1.1 500 Internal server error", true, 500);
+error_reporting(-1);
+
+echo $a
+
 ?><html>
 <head>
 	<title>THERE</title>
@@ -11,6 +15,5 @@ echo "THERE";
 		<input type="submit"?>
 	</form>
 	<pre><?= var_dump($_POST); ?></pre>
-	<pre><?= var_dump($_SERVER); ?></pre>
 </body>
 </html>

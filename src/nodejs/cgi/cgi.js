@@ -1,8 +1,16 @@
+/*/// --------------------------------------------------------------------------
+	DEPENDENCIES
+/*/// --------------------------------------------------------------------------
+
 var http  = require("http")
 	, spawn = require("child_process").spawn
 	, url   = require("url")
 	, fs    = require("fs")
 	, path  = require("path")
+
+/*/// --------------------------------------------------------------------------
+	CGI Server
+/*/// --------------------------------------------------------------------------
 
 http.createServer(function(req, res){
 	var query = url.parse(req.url, true)
@@ -10,7 +18,6 @@ http.createServer(function(req, res){
 	req.uri   = query.pathname
 	req.query = query.query
 
-	//var env = extend({}, {
 	var pathname = path.join(process.env.PWD, query.pathname)
 
 	if ( ! fs.existsSync(pathname)) {
@@ -25,27 +32,27 @@ http.createServer(function(req, res){
 		return notFound(res)
 	}
 
+	// Create process environment with CGI variables
 	var env = extend({}, process.env, {
 		GATEWAY_INTERFACE : 'CGI/1.1',
-	    SCRIPT_FILENAME   : pathname,
-	    DOCUMENT_ROOT     : process.env.PWD,
-	    SERVER_NAME       : 'localhost',
-	    SERVER_PORT       : 8090,
-	    SERVER_PROTOCOL   : 'HTTP/1.1',
-	    SERVER_SOFTWARE   : 'node/' + process.version,
-	    REDIRECT_STATUS   : 1
+    SCRIPT_FILENAME   : pathname,
+    DOCUMENT_ROOT     : process.env.PWD,
+    SERVER_NAME       : 'localhost',
+    SERVER_PORT       : 8090,
+    SERVER_PROTOCOL   : 'HTTP/1.1',
+    SERVER_SOFTWARE   : 'node/' + process.version,
+    REDIRECT_STATUS   : 1,
+		REQUEST_METHOD    : req.method,
+		QUERY_STRING      : query.search
 	})
 
+	// Add HTTP headers to environment prefixed with 'HTTP_'
 	for (var header in req.headers) {
 		var name = 'HTTP_' + header.toUpperCase().replace(/-/g, '_')
 		env[name] = req.headers[header]
 	}
 	
-	extend(env, {
-		REQUEST_METHOD : req.method,
-		QUERY_STRING   : query.search
-	})
-
+	// Add special environment variables to process incoming data	
 	if ('content-length' in req.headers) {
 		env.CONTENT_LENGTH = req.headers['content-length']
 	}
@@ -57,40 +64,69 @@ http.createServer(function(req, res){
 	var  cgi = spawn('php-cgi', ["-c", "/etc/php.ini"], { env : env });
 
 	if (req.method != 'GET') {
+		// Redirect HTTP request body to cgi input
 		req.pipe(cgi.stdin)
 	}
-	//process.stdin.pipe(cgi.stdin)
+	
+	// PROCESS CGI RESPONSE -----------------------------------------------------
 	
 	var headers = false
+
+	var buff    = new Buffer('', 'utf-8')
+		, headers = false
+
 	cgi.stdout.on('data', function (data) {
+		if ( ! headers) {
+			header = true
 
-		data = data + ''
-		if (! headers) {
-		  while (! /^\r\n/.test(data)) {
-		    var match = /^([A-z][-_A-z]*):\s(.*)\r\n/.exec(data)
-		    if (match) {
-		      res.setHeader(match[1], match[2])
-		      data = data.substr(match[0].length)
-		    }
+			var data = data.toString('utf-8')
+			
+			// Parse headers
+			while (true) {
+				var crlfPos = data.indexOf("\r\n")
 
-		    if (!data.length) break;
-		  }
+				if ( crlfPos < 0) break;
 
-		  if (data.length) headers = true
+				var header = data.substr(0, crlfPos);
+				if ( ! header.length) break;
+
+				header = header.split(/:\s*/, 2)
+				if (header.length !== 2) break;
+				
+				data = data.substr(crlfPos + 2)
+
+				var name  = header[0]
+					, value = header[1]
+
+				if (name == 'Status') {
+					res.statusCode = parseInt(value, 10) || 0
+				} else {
+					res.setHeader(name, value)
+				}
+
+			}
+
+			res.write(buff.toString('utf-8'))
+			res.write(data)
+			buff = new Buffer('')
+		} else {
+			res.write(buff.toString('utf-8'))
+			res.write(data)
 		}
-
-	  res.write('' + data);
 	});
 
 	cgi.stderr.on('data', function (data) {
-	  res.write('Error: ' + data);
+		// Prevent output before headers are sent. Use buffering to collect output
+		if ( ! headers) {
+		  buff = Buffer.concat([buff, data], buff.length + data.length)
+		} else {
+			res.write(data)
+		}
 	});
 
 	cgi.on('exit', function (code) {
 	  res.end();
 	});
-
-	//res.end(JSON.stringify(url.parse(req.url, true)))
 
 }).listen(8090)
 
